@@ -6,25 +6,45 @@ from dateutil.relativedelta import relativedelta
 import time
 
 # ==========================================
-# KONFIGURASI HALAMAN
+# 1. KONFIGURASI HALAMAN
 # ==========================================
-st.set_page_config(page_title="TPM Control System", layout="wide")
+st.set_page_config(page_title="TPM Control System - TMMIN", layout="wide")
 
 # ==========================================
-# FUNGSI CSS CUSTOM
+# 2. STYLE CSS (Tampilan Sidebar & Panel)
 # ==========================================
 def set_style():
     style = '''
     <style>
     .stApp { background-color: #0e1117; color: #ffffff; }
-    [data-testid="stSidebar"] { background-color: #ffffff !important; padding-top: 0rem !important; }
-    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] h1, 
-    [data-testid="stSidebar"] h3 { color: #000000 !important; }
-    .stProgress > div > div > div > div { background-color: #ff0000; }
-    div.stButton > button { background-color: #ff0000; color: white; border: none; }
-    .block-container { padding-top: 1rem !important; }
-    h1 { margin-top: -30px !important; }
+    
+    /* Sidebar Putih */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        padding-top: 0.5rem !important;
+    }
+    
+    /* Teks Sidebar Hitam */
+    [data-testid="stSidebar"] .stMarkdown, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h3 {
+        color: #000000 !important;
+    }
+    
+    /* Tombol Navigasi Merah */
+    div.stButton > button {
+        background-color: #ff0000;
+        color: white;
+        border: none;
+        font-weight: bold;
+        border-radius: 8px;
+    }
+    
+    .block-container {
+        padding-top: 1.5rem !important;
+    }
     </style>
     '''
     st.markdown(style, unsafe_allow_html=True)
@@ -32,108 +52,130 @@ def set_style():
 set_style()
 
 # ==========================================
-# KONFIGURASI DATABASE
+# 3. MANAJEMEN DATABASE (CSV)
 # ==========================================
 FILE_DATA = "data_gudang.csv"
 list_line = ["Sand Preparation", "Moulding", "Core Making", "Finishing", "RCS Pretreatment", "Melting"]
 
 def muat_data():
     if os.path.exists(FILE_DATA):
-        df = pd.read_csv(FILE_DATA)
-        df['Tanggal Terakhir Ganti'] = pd.to_datetime(df['Tanggal Terakhir Ganti']).dt.date
-        df['Jadwal Jatuh Tempo'] = pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.date
-        return df
+        try:
+            df = pd.read_csv(FILE_DATA)
+            df['Tanggal Terakhir Ganti'] = pd.to_datetime(df['Tanggal Terakhir Ganti']).dt.date
+            df['Jadwal Jatuh Tempo'] = pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.date
+            return df
+        except:
+            return buat_template_awal()
     else:
-        # Template data awal jika file tidak ada
-        data = {'ID': [1], 'Nama Mesin': ['Bucket Elevator'], 'Nama Part': ['Bearing 6205'], 
-                'Line Produksi': ['Moulding'], 'Lokasi Rak': ['Zone 4'], 'Stok': [10], 
-                'Rentang Waktu (Bulan)': [1], 'Tanggal Terakhir Ganti': [datetime.now().date()], 
-                'Jadwal Jatuh Tempo': [datetime.now().date() + relativedelta(months=1)], 
-                'Status TPM': ['On Progress'], 'PIC': ['Admin']}
-        df = pd.DataFrame(data)
-        df.to_csv(FILE_DATA, index=False)
-        return df
+        return buat_template_awal()
+
+def buat_template_awal():
+    data = {
+        'ID': [1],
+        'Nama Mesin': ['Bucket Elevator'],
+        'Nama Part': ['Bearing 6205'],
+        'Line Produksi': ['Moulding'],
+        'Lokasi Rak': ['Zone 4'],
+        'Stok': [10],
+        'Rentang Waktu (Bulan)': [1],
+        'Tanggal Terakhir Ganti': [datetime.now().date()],
+        'Jadwal Jatuh Tempo': [datetime.now().date() + relativedelta(months=1)],
+        'Status TPM': ['On Progress'],
+        'PIC': ['Admin']
+    }
+    df = pd.DataFrame(data)
+    df.to_csv(FILE_DATA, index=False)
+    return df
 
 df = muat_data()
 
 # ==========================================
-# SIDEBAR (Statik)
+# 4. SIDEBAR (Navigasi & Pencarian)
 # ==========================================
 with st.sidebar:
-    # Logo
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Toyota_carlogo.svg/1200px-Toyota_carlogo.svg.png", use_container_width=True)
+    # Logo Cadangan jika file tidak ada
+    st.markdown("<h1 style='text-align: center; color: #ff0000; margin-bottom: 0;'>TOYOTA</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: black; margin-top: -10px;'>INDONESIA</p>", unsafe_allow_html=True)
     
-    # Placeholder untuk Jam (Akan diisi di bagian bawah kode)
+    # PLACEHOLDER JAM (PENTING: Diupdate di akhir kode)
     container_jam = st.empty()
     
     st.markdown("---")
-    st.markdown("### 🔍 Cari Sparepart")
-    search_query = st.text_input("Ketik nama...", label_visibility="collapsed")
+    
+    if 'page' not in st.session_state:
+        st.session_state.page = "Dashboard"
+        
+    st.markdown("### 🧭 Menu Utama")
+    if st.button("📊 Dashboard Monitoring", use_container_width=True):
+        st.session_state.page = "Dashboard"
+    if st.button("🛠️ Update Penggantian Part", use_container_width=True):
+        st.session_state.page = "Update"
+    if st.button("➕ Master Data Part", use_container_width=True):
+        st.session_state.page = "Master"
     
     st.markdown("---")
-    st.markdown("### 🧭 Menu Utama")
-    if 'page' not in st.session_state: st.session_state.page = "Dashboard"
-    
-    if st.button("📊 Dashboard Monitoring", use_container_width=True): st.session_state.page = "Dashboard"
-    if st.button("🛠️ Update Penggantian Part", use_container_width=True): st.session_state.page = "Update"
-    if st.button("➕ Master Data Part", use_container_width=True): st.session_state.page = "Master"
+    st.markdown("### 🔍 Cari Sparepart")
+    search_query = st.text_input("Cari...", placeholder="Nama part/mesin", label_visibility="collapsed")
 
 # ==========================================
-# HALAMAN UTAMA
+# 5. HALAMAN UTAMA
 # ==========================================
+
 if search_query:
     st.title("🔍 Hasil Pencarian")
     results = df[df['Nama Part'].str.contains(search_query, case=False, na=False)]
     st.dataframe(results, use_container_width=True)
 
 elif st.session_state.page == "Dashboard":
-    st.title("📊 Maindashboard")
-    t1, t2, t3 = st.columns(3)
-    t1.metric("Total Items", len(df))
-    t2.metric("Perlu Ganti", len(df[df['Jadwal Jatuh Tempo'] <= datetime.now().date()]))
-    # Perbaikan typo Status TPN ke Status TPM sesuai error sebelumnya
-    t3.metric("Selesai TPM", len(df[df['Status TPM'] == 'Finish']))
+    st.title("📊 Maindashboard Monitoring")
+    
+    today = datetime.now().date()
+    
+    # Metrik (FIXED: Status TPM bukan Status TPN)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Items", len(df))
+    c2.metric("Perlu Ganti (Delay)", len(df[df['Jadwal Jatuh Tempo'] <= today]))
+    c3.metric("Selesai TPM", len(df[df['Status TPM'] == 'Finish']))
     
     st.markdown("---")
     st.subheader("🚧 Progress TPM per Line Produksi")
     cols = st.columns(2)
     for i, line in enumerate(list_line):
         with cols[i % 2]:
-            df_l = df[df['Line Produksi'] == line]
+            df_line = df[df['Line Produksi'] == line]
             st.write(f"**{line}**")
-            if not df_l.empty:
-                prog = len(df_l[df_l['Status TPM'] == 'Finish']) / len(df_l)
-                st.progress(prog)
-            else: st.caption("Belum ada data.")
+            if not df_line.empty:
+                done = len(df_line[df_line['Status TPM'] == 'Finish'])
+                st.progress(done / len(df_line))
+            else:
+                st.caption("Data kosong.")
 
 elif st.session_state.page == "Update":
-    st.title("🛠️ Update Penggantian")
-    # Form update sederhana
-    with st.form("form_update"):
+    st.title("🛠️ Form Update Penggantian")
+    with st.form("update_form"):
         pilih = st.selectbox("Pilih Part", df['Nama Part'].tolist())
-        pic = st.text_input("PIC")
-        if st.form_submit_button("Simpan"):
-            st.success("Data diperbarui!")
+        pic_input = st.text_input("PIC Eksekutor")
+        if st.form_submit_button("Submit"):
+            st.success("Data berhasil diupdate!")
 
 elif st.session_state.page == "Master":
     st.title("➕ Master Data Part")
-    # Tampilan editor data sesuai gambar terakhir
-    st.data_editor(df, use_container_width=True)
+    st.data_editor(df, use_container_width=True, num_rows="dynamic")
 
 # ==========================================
-# LOGIKA JAM REAL-TIME (Ditaruh paling bawah)
+# 6. LOGIKA JAM REAL-TIME (Detik Berjalan)
 # ==========================================
-# Menggunakan loop agar jam terus berdetak
 while True:
-    skrg = datetime.now()
-    tgl = skrg.strftime("%A, %d %B %Y")
-    jam = skrg.strftime("%H:%M:%S")
+    now = datetime.now()
+    tgl_display = now.strftime("%A, %d %B %Y")
+    jam_display = now.strftime("%H:%M:%S")
     
+    # Update hanya bagian jam di sidebar
     container_jam.markdown(f"""
         <div style="text-align: center;">
-            <p style="font-size: 1.1rem; font-weight: bold; margin-bottom: 0;">{tgl}</p>
-            <h1 style="font-size: 3rem; margin-top: -10px; color: #000000;">{jam}</h1>
+            <p style="font-size: 1.1rem; font-weight: bold; margin-bottom: 0;">{tgl_display}</p>
+            <h1 style="font-size: 3rem; margin-top: -10px; color: #000000;">{jam_display}</h1>
         </div>
     """, unsafe_allow_html=True)
     
-    time.sleep(1) # Tunggu 1 detik lalu update lagi
+    time.sleep(1)
