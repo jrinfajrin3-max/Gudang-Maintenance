@@ -1,267 +1,329 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import date
-import base64
-import time # Tambahkan library time untuk jeda
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+import time
 
 # ==========================================
 # KONFIGURASI HALAMAN
 # ==========================================
-st.set_page_config(page_title="Control Parts Maintenance", layout="wide")
+st.set_page_config(page_title="TPM Control System", layout="wide")
 
 # ==========================================
-# FUNGSI CSS & GAMBAR
+# FUNGSI CSS CUSTOM (MENAIKKAN KONTEN & CSS)
 # ==========================================
-def set_futuristic_style():
-    """Mengatur tema CSS: Dark mode, neon accents, white sidebar"""
-    
-    style = f'''
+def set_style():
+    style = '''
     <style>
-    /* Mengatur Background Halaman Utama */
-    .stApp {{
-        background-color: #0e1117; /* Dark background */
-        color: #ffffff;
-    }}
+    .stApp { background-color: #1e2530; color: #ffffff; }
     
-    /* SIDEBAR TETAP PUTIH */
-    [data-testid="stSidebar"] {{
-        background-image: none;
-        background-color: #ffffff; 
-    }}
-    [data-testid="stSidebar"]::before {{
-        display: none;
-    }}
+    /* Sidebar Putih Clean & Mentok Atas */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        padding-top: 0rem !important; /* Mengurangi padding atas */
+    }
+    
+    /* Teks Sidebar Hitam */
+    [data-testid="stSidebar"] .stMarkdown, 
     [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] p, 
-    [data-testid="stSidebar"] h3 {{
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] h4 {
         color: #000000 !important;
-    }}
+    }
     
-    .block-container {{
-        background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 15px;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        padding-left: 3rem;
-        padding-right: 3rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }}
+    /* Progress Bar Merah */
+    .stProgress > div > div > div > div {
+        background-color: #ff0000;
+    }
     
-    [data-testid="stMetricValue"] {{
-        font-size: 30px;
-        color: #00f2fe; /* Neon Cyan */
-        font-weight: bold;
-    }}
+    /* Tombol Aksi */
+    div.stButton > button {
+        background-color: #ff0000;
+        color: white;
+        border: none;
+        margin-top: -10px; /* Menarik tombol lebih ke atas */
+    }
+
+    /* Mengatur jarak elemen di sidebar */
+    [data-testid="stSidebar"] .block-container {
+        padding-top: 0rem !important;
+    }
+
+    /* --- PERBAIKAN: MENAIKKAN KONTEN KANAN --- */
+    .block-container {
+        padding-top: 1rem !important; /* Mengurangi jarak atas */
+        margin-top: -20px; /* Menarik konten lebih ke atas */
+    }
     
-    h1, h2, h3, h4, p, label {{
-        color: #ffffff !important;
-    }}
-    
-    [data-testid="stDataFrame"] {{
-        border: 1px solid #333333;
-    }}
-    
-    /* CSS UNTUK TULISAN KONFIRMASI BESAR */
-    .big-font {{
-        font-size:30px !important;
-        font-weight: bold;
-        text-align: center;
-        color: #00ff00; /* Hijau neon */
-        padding: 20px;
-        border: 2px solid #00ff00;
-        border-radius: 10px;
-        margin-bottom: 20px;
-    }}
-    
+    /* Memastikan judul naik */
+    h1 {
+        margin-top: -30px !important;
+    }
     </style>
     '''
+    # CARA PERBAIKAN: Gunakan markdown untuk menyisipkan gaya
     st.markdown(style, unsafe_allow_html=True)
 
-set_futuristic_style()
+set_style()
 
 # ==========================================
 # KONFIGURASI DATABASE
 # ==========================================
 FILE_DATA = "data_gudang.csv"
+list_line = ["Sand Preparation", "Moulding", "Core Making", "Finishing", "RCS Pretreatment", "Melting"]
+
+# Mapping lokasi otomatis
+mapping_lokasi = {
+    "Sand Preparation": "Zone 3",
+    "Moulding": "Zone 4",
+    "Core Making": "Zone 2",
+    "RCS Pretreatment": "Zone 2",
+    "Finishing": "Zone 1",
+    "Melting": "Zone 5"
+}
+
+def buat_data_baru():
+    data = {
+        'ID': [1],
+        'Nama Mesin': ['Bucket Elevator'],
+        'Nama Part': ['Bearing 6205'],
+        'Line Produksi': ['Moulding'],
+        'Lokasi Rak': ['Zone 4'],
+        'Stok': [10],
+        'Rentang Waktu (Bulan)': [1],
+        'Tanggal Terakhir Ganti': [datetime.now().date()],
+        'Jadwal Jatuh Tempo': [datetime.now().date() + relativedelta(months=1)],
+        'Status TPM': ['On Progress'],
+        'PIC': ['Admin']
+    }
+    df = pd.DataFrame(data)
+    df.to_csv(FILE_DATA, index=False)
+    return df
 
 def muat_data():
     if os.path.exists(FILE_DATA):
-        df = pd.read_csv(FILE_DATA)
-        df['Jadwal Jatuh Tempo'] = pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.date
-        return df
+        try:
+            df = pd.read_csv(FILE_DATA)
+            required_columns = ['Tanggal Terakhir Ganti', 'Jadwal Jatuh Tempo']
+            for col in required_columns:
+                if col not in df.columns:
+                    df[col] = datetime.now().date()
+            
+            df['Tanggal Terakhir Ganti'] = pd.to_datetime(df['Tanggal Terakhir Ganti']).dt.date
+            df['Jadwal Jatuh Tempo'] = pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.date
+            return df
+        except Exception as e:
+            st.error(f"Error membaca database: {e}")
+            return buat_data_baru()
     else:
-        return pd.DataFrame(columns=['ID', 'Nama Barang', 'Kategori', 'Status', 'Stok', 
-                                   'Min_Stok', 'Line Produksi', 'PIC', 'Jadwal Jatuh Tempo', 'Lokasi Rak'])
+        return buat_data_baru()
 
 df = muat_data()
-list_line = ["Sand Preparation", "Moulding", "Core Making", "Finishing", "RCS Pretreatment", "Melting"]
-list_status = ["New", "Repairable", "Refurbished", "Scrap"]
 
 # ==========================================
-# SIDEBAR - PENCARIAN & MENU
+# SIDEBAR (Logo, Jam, Menu, Pencarian)
 # ==========================================
 with st.sidebar:
-    # --- LOGO TOYOTA ---
+    # 1. Logo Toyota Besar di Tengah (Mentok Atas)
     if os.path.exists("logo_toyota.png"):
-        with open("logo_toyota.png", "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-            st.markdown(
-                f'<div style="text-align: center; margin-top: -20px;"><img src="data:image/png;base64,{encoded_string}" width="200"></div>',
-                unsafe_allow_html=True
-            )
+        st.image("logo_toyota.png", use_container_width=True) # Menggunakan lebar penuh sidebar
+    else:
+        st.markdown("<h2 style='text-align: center; color: black; margin-top: -20px;'>TOYOTA</h2>", unsafe_allow_html=True)
+    
+    # 2. Tanggal dan Jam (Ukuran Besar & Bold)
+    sekarang = datetime.now()
+    tgl_str = sekarang.strftime("%A, %d %B %Y")
+    jam_str = sekarang.strftime("%H:%M:%S")
+    
+    st.markdown(f"<p style='text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 0; margin-top: -10px;'>{tgl_str}</p>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: -10px;'>{jam_str}</h1>", unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # --- FITUR PENCARIAN ---
-    st.subheader("🔍 Cari Sparepart")
-    search_term = st.text_input("Nama barang...", placeholder="Contoh: Bearing")
+    # 3. Kotak Pencarian Sparepart
+    st.markdown("### 🔍 Cari Sparepart / Mesin")
+    search_query = st.text_input("Ketik nama...", key="search_bar", label_visibility="collapsed")
+    
     st.markdown("---")
     
-    # --- MENU NAVIGATION ---
-    app_mode = st.radio(
-        "Mode Tampilan Utama:",
-        ["Dashboard Utama", "Update Gudang"]
-    )
-    st.info("Sistem Manajemen Sparepart Maintenance")
-
-# ==========================================
-# TAMPILAN UTAMA
-# ==========================================
-
-# --- LOGIKA PENCARIAN (Filtering Data) ---
-df_filtered = df.copy()
-if search_term:
-    df_filtered = df_filtered[df_filtered['Nama Barang'].str.contains(search_term, case=False, na=False)]
-
-# --- MODE: DASHBOARD ---
-if app_mode == "Dashboard Utama":
+    # 4. Menu Navigasi
+    st.markdown("### 🧭 Menu Utama")
+    if 'page' not in st.session_state:
+        st.session_state.page = "Dashboard"
     
-    # KONDISI: JIKA ADA PENCARIAN, TAMPILKAN HANYA HASIL PENCARIAN
-    if search_term:
-        st.title("🔎 Hasil Pencarian")
+    if st.button("📊 Dashboard Monitoring", use_container_width=True):
+        st.session_state.page = "Dashboard"
+    if st.button("🛠️ Update Penggantian Part", use_container_width=True):
+        st.session_state.page = "Update"
+    if st.button("➕ Master Data Part", use_container_width=True):
+        st.session_state.page = "Master"
+
+# ==========================================
+# LOGIKA PENCARIAN (TAMPIL DI HALAMAN UTAMA)
+# ==========================================
+if search_query:
+    st.title("🔍 Hasil Pencarian")
+    
+    results = df[
+        df['Nama Part'].str.contains(search_query, case=False, na=False) |
+        df['Nama Mesin'].str.contains(search_query, case=False, na=False)
+    ].copy() 
+    
+    if not results.empty:
+        st.dataframe(
+            results[['ID', 'Nama Mesin', 'Nama Part', 'Line Produksi', 'Lokasi Rak', 'Stok', 'Status TPM']], 
+            use_container_width=True
+        )
         
-        if not df_filtered.empty:
-            # Kolom untuk Data Inventaris
-            st.write("📦 **Data Inventaris**")
-            st.dataframe(df_filtered[['Nama Barang', 'Stok', 'Lokasi Rak']], use_container_width=True, hide_index=True)
-            
-            st.markdown("---")
-            
-            # Kolom untuk Pengambilan Barang
-            st.write("🛠️ **Pengambilan Barang**")
-            with st.form("take_form_search"):
-                item_list = df_filtered['Nama Barang'].unique().tolist()
-                selected_item = st.selectbox("Pilih Barang", item_list)
-                qty_out = st.number_input("Jumlah Diambil", min_value=1)
-                status_bekas = st.selectbox("Status Barang yang Dilepas", ["New", "Repairable", "Scrap"])
-                
-                take_btn = st.form_submit_button("Ambil & Proses")
-                
-                if take_btn:
-                    current_stock = df.loc[df['Nama Barang'] == selected_item, 'Stok'].values[0]
-                    if qty_out <= current_stock:
-                        df.loc[df['Nama Barang'] == selected_item, 'Stok'] -= qty_out
+        st.markdown("---")
+        st.subheader("🛠️ Aksi Pengambilan Barang")
+        
+        for index, row in results.iterrows():
+            col_part, col_btn = st.columns([3, 1])
+            with col_part:
+                st.write(f"**{row['Nama Part']}** - Mesin: {row['Nama Mesin']}")
+                st.caption(f"Lokasi Rak: {row['Lokasi Rak']} | Stok: {row['Stok']}")
+            with col_btn:
+                if st.button(f"Ambil", key=f"btn_{row['ID']}"):
+                    if row['Stok'] > 0:
+                        df.at[index, 'Stok'] = row['Stok'] - 1
                         df.to_csv(FILE_DATA, index=False)
-                        
-                        # --- KONFIRMASI PENGAMBILAN (Besar di Tengah) ---
-                        st.markdown(f'<p class="big-font">✅ BERHASIL MENGAMBIL {qty_out} PCS {selected_item.upper()}!</p>', unsafe_allow_html=True)
-                        time.sleep(2) # Beri jeda 2 detik agar terbaca
-                        
-                        if status_bekas == "Repairable":
-                            st.warning(f"Barang {selected_item} dikirim ke workshop untuk repair.")
+                        st.success(f"1 {row['Nama Part']} diambil dari {row['Lokasi Rak']}.")
+                        time.sleep(1)
                         st.rerun()
                     else:
-                        st.error("❌ Stok tidak cukup!")
-        else:
-            st.warning("Barang tidak ditemukan.")
-
-    # KONDISI: JIKA TIDAK ADA PENCARIAN, TAMPILKAN DASHBOARD NORMAL
+                        st.error("Stok habis!")
+                    
     else:
-        st.title("📊 Control Parts Maintenance Dashboard")
-        
-        if not df.empty:
-            today = date.today()
-            current_month = today.month
-            current_year = today.year
-            
-            due_items = df[
-                (pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.month == current_month) &
-                (pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.year == current_year) &
-                (df['Status'] != 'Scrap')
-            ]
-            
-            # KPI Cards
-            st.subheader("Ringkasan")
-            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-            total_items = len(df[df['Status'] != 'Scrap'])
-            low_stock = len(df[(df['Stok'] <= df['Min_Stok']) & (df['Status'] != 'Scrap')])
-            
-            kpi1.metric("Total Item Aktif", total_items)
-            kpi2.metric("⚠️ Perlu Restock", low_stock)
-            kpi3.metric("📅 Jatuh Tempo", len(due_items))
-            kpi4.metric("Line Terpantau", len(list_line))
+        st.warning("Data tidak ditemukan.")
+    st.markdown("---")
 
-            st.markdown("---")
-            
-            # 1. INDIKATOR LINE PRODUKSI
-            st.subheader("Acuan Jadwal & Pengolahan Produksi")
-            num_lines = len(list_line)
-            cols = st.columns(num_lines)
-            for i, line in enumerate(list_line):
-                items_due_line = len(due_items[due_items['Line Produksi'] == line])
-                with cols[i]:
-                    if items_due_line > 0:
-                        st.error(f"**{line}**\n\n⚠️ **{items_due_line}** Jatuh Tempo")
-                    else:
-                        st.success(f"**{line}**\n\n✅ Aman")
-
-            st.markdown("---")
-            
-            # 2. TABEL BARANG (Semua)
-            st.subheader("Daftar Inventaris Lengkap")
-            st.dataframe(df[['Nama Barang', 'Status', 'Stok', 'Line Produksi', 'Jadwal Jatuh Tempo', 'Lokasi Rak']], use_container_width=True)
-                
-        else:
-            st.warning("Data kosong. Silakan input data di menu Update Gudang.")
-
-# --- MODE: UPDATE ---
-elif app_mode == "Update Gudang":
-    st.title("📥 Update Gudang / Workshop")
+# ==========================================
+# HALAMAN 1: DASHBOARD MONITORING
+# ==========================================
+elif st.session_state.page == "Dashboard":
+    # --- PERBAIKAN: JUDUL DASHBOARD DISAMBUNG ---
+    st.title("📊 Maindashboard") # Disambung
     
-    with st.form("input_form"):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            nama = st.text_input("Nama Sparepart")
-            line = st.selectbox("Line Produksi", list_line)
-            qty = st.number_input("Jumlah", min_value=1)
-            jadwal_tgl = st.date_input("Jadwal Jatuh Tempo", date.today())
-            
-        with col_b:
-            status = st.selectbox("Status", list_status)
-            pic = st.text_input("PIC Mesin")
-            lokasi = st.text_input("Lokasi Rak/Workshop")
-            min_stok = st.number_input("Min Stok", min_value=0, value=5)
-            
-        submitted = st.form_submit_button("Update Inventaris")
-        
-        if submitted:
-            if nama in df['Nama Barang'].values:
-                df.loc[df['Nama Barang'] == nama, 'Stok'] += qty
-                df.loc[df['Nama Barang'] == nama, 'Status'] = status
-                df.loc[df['Nama Barang'] == nama, 'Line Produksi'] = line
-                df.loc[df['Nama Barang'] == nama, 'Jadwal Jatuh Tempo'] = jadwal_tgl
-                df.loc[df['Nama Barang'] == nama, 'PIC'] = pic
-                df.loc[df['Nama Barang'] == nama, 'Lokasi Rak'] = lokasi
+    today = datetime.now().date()
+    
+    c1, c2, c3 = st.columns(3)
+    total_part = len(df)
+    total_delay = len(df[df['Jadwal Jatuh Tempo'] <= today])
+    total_finish = len(df[df['Status TPM'] == 'Finish'])
+    
+    c1.metric("Total Items", total_part)
+    c2.metric("Perlu Ganti (Delay)", total_delay, delta_color="inverse")
+    c3.metric("Selesai TPM", total_finish)
+    
+    st.markdown("---")
+    st.subheader("🚧 Progress TPM per Line Produksi")
+    
+    col_line = st.columns(2)
+    for idx, line in enumerate(list_line):
+        with col_line[idx % 2]:
+            df_line = df[df['Line Produksi'] == line]
+            if not df_line.empty:
+                count_total = len(df_line)
+                count_done = len(df_line[df_line['Status TPM'] == 'Finish'])
+                prog = count_done / count_total
+                
+                st.write(f"**{line}** ({count_done}/{count_total} Part Selesai)")
+                st.progress(prog)
             else:
-                new_data = pd.DataFrame([[len(df)+1, nama, "Mechanical", status, qty, min_stok, line, pic, jadwal_tgl, lokasi]], columns=df.columns)
-                df = pd.concat([df, new_data], ignore_index=True)
+                st.write(f"**{line}**")
+                st.caption("Belum ada data part di line ini.")
+    
+    st.markdown("---")
+    st.subheader("⚠️ List Part Delay (Segera Ganti)")
+    df_warn = df[df['Jadwal Jatuh Tempo'] <= today]
+    if not df_warn.empty:
+        st.table(df_warn[['Line Produksi', 'Nama Mesin', 'Nama Part', 'Jadwal Jatuh Tempo', 'PIC']])
+    else:
+        st.success("Semua part dalam kondisi On Schedule!")
+
+# ==========================================
+# HALAMAN 2: UPDATE PENGGANTIAN
+# ==========================================
+elif st.session_state.page == "Update":
+    st.title("🛠️ Form Penggantian Sparepart")
+    
+    with st.form("update_form"):
+        part_pilihan = df['Nama Mesin'] + " | " + df['Nama Part']
+        pilih = st.selectbox("Pilih Mesin & Part", part_pilihan)
+        tgl_ganti = st.date_input("Tanggal Penggantian", datetime.now())
+        pic_update = st.text_input("PIC Eksekutor")
+        
+        submit = st.form_submit_button("Konfirmasi Selesai Ganti")
+        
+        if submit:
+            idx = df[df['Nama Mesin'] + " | " + df['Nama Part'] == pilih].index[0]
+            rentang = df.at[idx, 'Rentang Waktu (Bulan)']
+            
+            df.at[idx, 'Tanggal Terakhir Ganti'] = tgl_ganti
+            df.at[idx, 'Jadwal Jatuh Tempo'] = tgl_ganti + relativedelta(months=int(rentang))
+            df.at[idx, 'Status TPM'] = 'Finish'
+            df.at[idx, 'PIC'] = pic_update
             
             df.to_csv(FILE_DATA, index=False)
-            
-            # --- KONFIRMASI UPDATE (Besar di Tengah) ---
-            st.markdown(f'<p class="big-font">✅ DATA {nama.upper()} BERHASIL DIPERBARUI!</p>', unsafe_allow_html=True)
-            time.sleep(2) # Beri jeda 2 detik
-            
-            # Tunggu sebentar lalu refresh
+            st.success("Data Berhasil Diperbarui! Jadwal otomatis diperpanjang.")
+            time.sleep(1)
             st.rerun()
+
+# ==========================================
+# HALAMAN 3: MASTER DATA (TAMBAH & EDIT)
+# ==========================================
+elif st.session_state.page == "Master":
+    st.title("➕ Manajemen Master Part")
+    
+    with st.expander("➕ Tambah Part Baru", expanded=True):
+        with st.form("master_form"):
+            c1, c2 = st.columns(2)
+            with c1:
+                m_line = st.selectbox("Line Produksi", list_line)
+                m_mesin = st.text_input("Nama Mesin")
+                m_part = st.text_input("Nama Part Sparepart")
+                
+                # Lokasi Otomatis
+                lokasi_default = mapping_lokasi.get(m_line, "")
+                m_lokasi = st.text_input("Lokasi Rak (Zone/Rak)", value=lokasi_default)
+                
+            with c2:
+                m_rentang = st.number_input("Siklus Ganti (Bulan)", min_value=1, value=1)
+                m_stok = st.number_input("Jumlah Stok Awal", min_value=0, value=1)
+                m_tgl = st.date_input("Tanggal Terakhir Ganti Saat Ini", datetime.now())
+                m_pic = st.text_input("PIC Penanggung Jawab")
+                
+            if st.form_submit_button("Simpan Data Master"):
+                jadwal_next = m_tgl + relativedelta(months=int(m_rentang))
+                new_row = {
+                    'ID': df['ID'].max() + 1 if not df.empty else 1,
+                    'Nama Mesin': m_mesin,
+                    'Nama Part': m_part,
+                    'Line Produksi': m_line,
+                    'Lokasi Rak': m_lokasi, 
+                    'Stok': m_stok,
+                    'Rentang Waktu (Bulan)': m_rentang,
+                    'Tanggal Terakhir Ganti': m_tgl,
+                    'Jadwal Jatuh Tempo': jadwal_next,
+                    'Status TPM': 'On Progress',
+                    'PIC': m_pic
+                }
+                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                df.to_csv(FILE_DATA, index=False)
+                st.success("Data Master Berhasil Ditambahkan!")
+                st.rerun()
+
+    st.markdown("---")
+    st.subheader("📋 Edit / Hapus Master Data")
+    
+    st.write("Edit data langsung pada tabel di bawah ini:")
+    edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic")
+    
+    if st.button("Simpan Perubahan Tabel"):
+        edited_df.to_csv(FILE_DATA, index=False)
+        st.success("Data Master Berhasil Diperbarui!")
+        st.rerun()
