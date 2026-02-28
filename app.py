@@ -166,4 +166,151 @@ def show_dashboard(data_df):
     delay_count = len(data_df[data_df['Jadwal Jatuh Tempo'] <= current_date_wib])
     col2.metric("Perlu Ganti (Delay)", delay_count)
     
-    # Filter Selesai
+    # Filter Selesai TPM (Gunakan 'Status TPM' agar tidak KeyError)
+    finish_count = len(data_df[data_df['Status TPM'] == 'Finish'])
+    col3.metric("Selesai TPM", finish_count)
+    
+    st.markdown("---")
+    
+    # Progress per Line
+    st.subheader("🚧 Progress TPM per Line Produksi")
+    p_col1, p_col2 = st.columns(2)
+    
+    for i, line in enumerate(LINE_LIST):
+        target_col = p_col1 if i % 2 == 0 else p_col2
+        with target_col:
+            df_line = data_df[data_df['Line Produksi'] == line]
+            st.write(f"**{line}**")
+            if not df_line.empty:
+                done = len(df_line[df_line['Status TPM'] == 'Finish'])
+                total = len(df_line)
+                progress = done / total
+                st.progress(progress)
+                st.caption(f"{done} dari {total} part selesai.")
+            else:
+                st.caption("Belum ada data part di line ini.")
+
+    st.markdown("---")
+    
+    # List Part Delay
+    st.subheader("⚠️ List Part Delay (Segera Ganti)")
+    df_delay = data_df[data_df['Jadwal Jatuh Tempo'] <= current_date_wib]
+    if not df_delay.empty:
+        st.warning(f"Terdapat {len(df_delay)} part yang melewati batas waktu penggantian!")
+        st.table(df_delay[['Nama Mesin', 'Nama Part', 'Jadwal Jatuh Tempo', 'PIC']])
+    else:
+        st.success("Semua part dalam kondisi On Schedule!")
+
+# ==========================================
+# 5. HALAMAN UPDATE PENGGANTIAN
+# ==========================================
+def show_update(data_df):
+    st.title("🛠️ Update Penggantian Part")
+    with st.form("form_update"):
+        st.write("Input data penggantian sparepart baru")
+        selected_part = st.selectbox("Pilih Part yang Diganti", 
+                                     options=(data_df['Nama Mesin'] + " | " + data_df['Nama Part']).tolist())
+        tgl_ganti = st.date_input("Tanggal Penggantian", datetime.now())
+        pic_input = st.text_input("PIC Eksekutor")
+        
+        if st.form_submit_button("Konfirmasi Update"):
+            # Cari baris data
+            idx = data_df[data_df['Nama Mesin'] + " | " + data_df['Nama Part'] == selected_part].index[0]
+            rentang = data_df.at[idx, 'Rentang Waktu (Bulan)']
+            
+            # Update Nilai
+            data_df.at[idx, 'Tanggal Terakhir Ganti'] = tgl_ganti
+            data_df.at[idx, 'Jadwal Jatuh Tempo'] = tgl_ganti + relativedelta(months=int(rentang))
+            data_df.at[idx, 'Status TPM'] = 'Finish'
+            data_df.at[idx, 'PIC'] = pic_input
+            
+            # Simpan
+            data_df.to_csv(DB_FILE, index=False)
+            st.success(f"Update Berhasil untuk {selected_part}!")
+            time.sleep(1)
+            st.rerun()
+
+# ==========================================
+# 6. HALAMAN MASTER DATA
+# ==========================================
+def show_master(data_df):
+    st.title("➕ Master Data Part")
+    
+    # Form Tambah Data Baru
+    with st.expander("➕ Tambah Part Baru"):
+        with st.form("add_new"):
+            c1, c2 = st.columns(2)
+            line_new = c1.selectbox("Line Produksi", LINE_LIST)
+            mesin_new = c1.text_input("Nama Mesin")
+            part_new = c1.text_input("Nama Part Sparepart")
+            lokasi_new = c1.text_input("Lokasi Rak (Zone/Rak)")
+            
+            siklus_new = c2.number_input("Siklus Ganti (Bulan)", min_value=1, value=1)
+            stok_new = c2.number_input("Jumlah Stok Awal", min_value=0, value=1)
+            tgl_awal = c2.date_input("Tanggal Terakhir Ganti Saat Ini")
+            pic_new = c2.text_input("PIC Penanggung Jawab")
+            
+            if st.form_submit_button("Simpan Data Master"):
+                new_id = data_df['ID'].max() + 1 if not data_df.empty else 1
+                jatuh_tempo = tgl_awal + relativedelta(months=int(siklus_new))
+                
+                new_row = {
+                    'ID': new_id, 'Nama Mesin': mesin_new, 'Nama Part': part_new,
+                    'Line Produksi': line_new, 'Lokasi Rak': lokasi_new, 'Stok': stok_new,
+                    'Rentang Waktu (Bulan)': siklus_new, 'Tanggal Terakhir Ganti': tgl_awal,
+                    'Jadwal Jatuh Tempo': jatuh_tempo, 'Status TPM': 'On Progress', 'PIC': pic_new
+                }
+                data_df = pd.concat([data_df, pd.DataFrame([new_row])], ignore_index=True)
+                data_df.to_csv(DB_FILE, index=False)
+                st.success("Data Part Berhasil Ditambahkan!")
+                st.rerun()
+
+    st.markdown("---")
+    st.subheader("📝 Edit / Hapus Master Data")
+    # Editor data interaktif
+    edited_df = st.data_editor(data_df, use_container_width=True, num_rows="dynamic")
+    
+    if st.button("Simpan Perubahan Master"):
+        edited_df.to_csv(DB_FILE, index=False)
+        st.success("Seluruh perubahan berhasil disimpan!")
+        st.rerun()
+
+# ==========================================
+# 7. LOGIKA JALANKAN APLIKASI
+# ==========================================
+
+# Logika Pencarian Universal
+if search_term:
+    st.title("🔍 Hasil Pencarian")
+    results = df[df['Nama Part'].str.contains(search_term, case=False, na=False) | 
+                 df['Nama Mesin'].str.contains(search_term, case=False, na=False)]
+    if not results.empty:
+        st.dataframe(results, use_container_width=True)
+    else:
+        st.warning(f"Tidak ada data ditemukan untuk kata kunci: {search_term}")
+else:
+    # Router Halaman
+    if st.session_state.current_page == "Dashboard":
+        show_dashboard(df)
+    elif st.session_state.current_page == "Update":
+        show_update(df)
+    elif st.session_state.current_page == "Master":
+        show_master(df)
+
+# ==========================================
+# 8. LOGIKA JAM REAL-TIME WIB (Update per Detik)
+# ==========================================
+# Penting: Loop ini harus di paling akhir agar tidak menghentikan fungsi streamlit di atas
+while True:
+    # GitHub Server (UTC) + 7 Jam = WIB
+    now_wib = datetime.utcnow() + timedelta(hours=7)
+    
+    clock_placeholder.markdown(f"""
+        <div style="text-align: center; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px; background-color: #f8f9fa; margin-top: 10px;">
+            <p style="font-size: 1.1rem; font-weight: bold; color: #333; margin-bottom: 0;">{now_wib.strftime("%A, %d %B %Y")}</p>
+            <h1 style="font-size: 2.8rem; margin-top: -10px; color: #000000; font-family: 'Courier New', Courier, monospace;">{now_wib.strftime("%H:%M:%S")}</h1>
+            <p style="font-size: 0.8rem; color: #ff0000; font-weight: bold; margin-top: -5px;">Waktu Indonesia Barat (WIB)</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    time.sleep(1) # Refresh setiap 1 detik agar jam berdetak
