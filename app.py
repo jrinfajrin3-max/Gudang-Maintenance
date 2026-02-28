@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta
 import time
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & THEME
+# 1. KONFIGURASI HALAMAN (PASTIKAN LAOUTE WIDE)
 # ==========================================
 st.set_page_config(
     page_title="TPM Control System - TMMIN", 
@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS untuk merapikan tampilan
+# Custom CSS untuk merapikan tampilan agar tidak berantakan
 def local_css():
     st.markdown("""
     <style>
@@ -90,7 +90,7 @@ def load_data():
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # Konversi kolom tanggal
+            # Konversi kolom tanggal agar tidak error
             df['Tanggal Terakhir Ganti'] = pd.to_datetime(df['Tanggal Terakhir Ganti']).dt.date
             df['Jadwal Jatuh Tempo'] = pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.date
             return df
@@ -100,13 +100,13 @@ def load_data():
         return create_initial_data()
 
 def create_initial_data():
-    # Menggunakan 'Status TPM' (BUKAN TPN)
+    # MENGGUNAKAN 'Status TPM' (PASTIKAN KOLOM DI CSV JUGA INI)
     data = {
         'ID': [1],
-        'Nama Mesin': ['Bucket Elevator'],
-        'Nama Part': ['Bearing 6205'],
+        'Nama Mesin': ['Contoh Mesin'],
+        'Nama Part': ['Contoh Part'],
         'Line Produksi': ['Moulding'],
-        'Lokasi Rak': ['Zone 4'],
+        'Lokasi Rak': ['Zone 1'],
         'Stok': [10],
         'Rentang Waktu (Bulan)': [1],
         'Tanggal Terakhir Ganti': [datetime.now().date()],
@@ -158,7 +158,7 @@ with st.sidebar:
 def show_dashboard(data_df):
     st.title("📊 Maindashboard Monitoring") #
     
-    # Zona Waktu WIB (UTC+7)
+    # Zona Waktu WIB (UTC+7) - MEMASTIKAN JAM & TANGGAL SESUAI
     current_date_wib = (datetime.utcnow() + timedelta(hours=7)).date()
     
     # Metrik Dashboard
@@ -288,7 +288,7 @@ if search_term:
     else:
         st.warning(f"Tidak ada data ditemukan untuk kata kunci: {search_term}")
 else:
-    # Router Halaman
+    # Router Halaman - MEMASTIKAN TIDAK BAYANGAN DASHBOARD
     if st.session_state.current_page == "Dashboard":
         show_dashboard(df)
     elif st.session_state.current_page == "Update":
