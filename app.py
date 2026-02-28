@@ -11,18 +11,17 @@ import time
 st.set_page_config(page_title="TPM Control System - TMMIN", layout="wide")
 
 # ==========================================
-# 2. STYLE CSS (Tampilan Sidebar & Panel)
+# 2. STYLE CSS (Merapikan Sidebar & Dashboard)
 # ==========================================
 def set_style():
     style = '''
     <style>
-    /* Background Utama Gelap */
     .stApp { background-color: #0e1117; color: #ffffff; }
     
-    /* Sidebar Putih Bersih */
+    /* Sidebar Putih */
     [data-testid="stSidebar"] {
         background-color: #ffffff !important;
-        padding-top: 0rem !important;
+        padding-top: 1rem !important;
     }
     
     /* Teks Sidebar Hitam */
@@ -34,25 +33,21 @@ def set_style():
         color: #000000 !important;
     }
     
-    /* Tombol Navigasi Merah */
+    /* Tombol Merah Toyota */
     div.stButton > button {
         background-color: #ff0000;
         color: white;
         border: none;
         font-weight: bold;
         border-radius: 8px;
-        height: 45px;
-        transition: 0.3s;
+        height: 42px;
+        width: 100%;
+        margin-bottom: -10px;
     }
     
-    div.stButton > button:hover {
-        background-color: #cc0000;
-    }
-    
-    /* Mengatur Jarak Konten Utama */
-    .block-container {
-        padding-top: 1.5rem !important;
-    }
+    /* Menghilangkan header default Streamlit agar bersih */
+    header {visibility: hidden;}
+    .block-container { padding-top: 2rem !important; }
     </style>
     '''
     st.markdown(style, unsafe_allow_html=True)
@@ -69,27 +64,22 @@ def muat_data():
     if os.path.exists(FILE_DATA):
         try:
             df = pd.read_csv(FILE_DATA)
+            # Standarisasi kolom tanggal
             df['Tanggal Terakhir Ganti'] = pd.to_datetime(df['Tanggal Terakhir Ganti']).dt.date
             df['Jadwal Jatuh Tempo'] = pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.date
             return df
         except:
-            return buat_template_awal()
+            return buat_data_baru()
     else:
-        return buat_template_awal()
+        return buat_data_baru()
 
-def buat_template_awal():
+def buat_data_baru():
     data = {
-        'ID': [1],
-        'Nama Mesin': ['Bucket Elevator'],
-        'Nama Part': ['Bearing 6205'],
-        'Line Produksi': ['Moulding'],
-        'Lokasi Rak': ['Zone 4'],
-        'Stok': [10],
-        'Rentang Waktu (Bulan)': [1],
-        'Tanggal Terakhir Ganti': [datetime.now().date()],
-        'Jadwal Jatuh Tempo': [datetime.now().date() + relativedelta(months=1)],
-        'Status TPM': ['On Progress'],
-        'PIC': ['Admin']
+        'ID': [1], 'Nama Mesin': ['Bucket Elevator'], 'Nama Part': ['Bearing 6205'], 
+        'Line Produksi': ['Moulding'], 'Lokasi Rak': ['Zone 4'], 'Stok': [10], 
+        'Rentang Waktu (Bulan)': [1], 'Tanggal Terakhir Ganti': [datetime.now().date()], 
+        'Jadwal Jatuh Tempo': [datetime.now().date() + relativedelta(months=1)], 
+        'Status TPM': ['On Progress'], 'PIC': ['Admin']
     }
     df = pd.DataFrame(data)
     df.to_csv(FILE_DATA, index=False)
@@ -98,52 +88,52 @@ def buat_template_awal():
 df = muat_data()
 
 # ==========================================
-# 4. SIDEBAR (Logo, Navigasi, Jam)
+# 4. SIDEBAR (Logo, Jam, Navigasi)
 # ==========================================
 with st.sidebar:
-    # --- FIX LOGO: Menggunakan URL agar pasti muncul di GitHub ---
+    # Logo Toyota Indonesia (Gunakan URL agar pasti muncul di Cloud)
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Toyota_carlogo.svg/1200px-Toyota_carlogo.svg.png", use_container_width=True)
     st.markdown("<p style='text-align: center; color: black; font-weight: bold; margin-top: -15px;'>INDONESIA</p>", unsafe_allow_html=True)
     
-    # Placeholder untuk Jam (Akan diupdate di akhir kode)
+    # Placeholder Jam Real-time (Detik menghitung)
     container_jam = st.empty()
     
     st.markdown("---")
     
+    # Inisialisasi Session State Halaman
     if 'page' not in st.session_state:
         st.session_state.page = "Dashboard"
         
     st.markdown("### 🧭 Menu Utama")
-    if st.button("📊 Dashboard Monitoring", use_container_width=True):
+    if st.button("📊 Dashboard Monitoring"):
         st.session_state.page = "Dashboard"
-    if st.button("🛠️ Update Penggantian Part", use_container_width=True):
+    if st.button("🛠️ Update Penggantian Part"):
         st.session_state.page = "Update"
-    if st.button("➕ Master Data Part", use_container_width=True):
+    if st.button("➕ Master Data Part"):
         st.session_state.page = "Master"
     
     st.markdown("---")
     st.markdown("### 🔍 Cari Sparepart")
-    search_query = st.text_input("Cari...", placeholder="Ketik nama part/mesin", label_visibility="collapsed")
+    search_query = st.text_input("Nama part/mesin...", placeholder="Ketik di sini", label_visibility="collapsed")
 
 # ==========================================
-# 5. LOGIKA HALAMAN UTAMA
+# 5. HALAMAN UTAMA
 # ==========================================
 
+# A. Logika Pencarian
 if search_query:
     st.title("🔍 Hasil Pencarian")
     results = df[df['Nama Part'].str.contains(search_query, case=False, na=False) | 
                  df['Nama Mesin'].str.contains(search_query, case=False, na=False)]
-    if not results.empty:
-        st.dataframe(results, use_container_width=True)
-    else:
-        st.warning("Data tidak ditemukan.")
+    st.dataframe(results, use_container_width=True)
 
+# B. Halaman Dashboard
 elif st.session_state.page == "Dashboard":
     st.title("📊 Maindashboard Monitoring")
     
     today = datetime.now().date()
     
-    # Metrik (FIXED: Menggunakan Status TPM sesuai database)
+    # METRIK (FIXED: Status TPM bukan TPN)
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Items", len(df))
     c2.metric("Perlu Ganti (Delay)", len(df[df['Jadwal Jatuh Tempo'] <= today]))
@@ -151,52 +141,57 @@ elif st.session_state.page == "Dashboard":
     
     st.markdown("---")
     st.subheader("🚧 Progress TPM per Line Produksi")
-    col_l = st.columns(2)
+    cols = st.columns(2)
     for i, line in enumerate(list_line):
-        with col_l[i % 2]:
-            df_line = df[df['Line Produksi'] == line]
+        with cols[i % 2]:
+            df_l = df[df['Line Produksi'] == line]
             st.write(f"**{line}**")
-            if not df_line.empty:
-                done = len(df_line[df_line['Status TPM'] == 'Finish'])
-                st.progress(done / len(df_line))
-                st.caption(f"{done} dari {len(df_line)} part selesai.")
+            if not df_l.empty:
+                selesai = len(df_l[df_l['Status TPM'] == 'Finish'])
+                st.progress(selesai / len(df_l))
+                st.caption(f"{selesai} dari {len(df_l)} part selesai.")
             else:
                 st.caption("Belum ada data.")
 
+# C. Halaman Update
 elif st.session_state.page == "Update":
-    st.title("🛠️ Update Penggantian Part")
+    st.title("🛠️ Update Status Penggantian")
     with st.form("form_update"):
-        pilih = st.selectbox("Pilih Part", (df['Nama Mesin'] + " | " + df['Nama Part']).tolist())
-        tgl = st.date_input("Tanggal Ganti", datetime.now())
-        pic = st.text_input("PIC Eksekutor")
-        if st.form_submit_button("Simpan Perubahan"):
-            idx = df[df['Nama Mesin'] + " | " + df['Nama Part'] == pilih].index[0]
-            rentang = df.at[idx, 'Rentang Waktu (Bulan)']
-            df.at[idx, 'Tanggal Terakhir Ganti'] = tgl
-            df.at[idx, 'Jadwal Jatuh Tempo'] = tgl + relativedelta(months=int(rentang))
+        pilihan = st.selectbox("Pilih Part", (df['Nama Mesin'] + " - " + df['Nama Part']).tolist())
+        pic_baru = st.text_input("PIC Eksekutor")
+        tgl_ganti = st.date_input("Tanggal Ganti Baru", today)
+        
+        if st.form_submit_button("Simpan Data"):
+            # Update logika CSV
+            idx = df[df['Nama Mesin'] + " - " + df['Nama Part'] == pilihan].index[0]
+            bln = df.at[idx, 'Rentang Waktu (Bulan)']
+            df.at[idx, 'Tanggal Terakhir Ganti'] = tgl_ganti
+            df.at[idx, 'Jadwal Jatuh Tempo'] = tgl_ganti + relativedelta(months=int(bln))
             df.at[idx, 'Status TPM'] = 'Finish'
-            df.at[idx, 'PIC'] = pic
+            df.at[idx, 'PIC'] = pic_baru
             df.to_csv(FILE_DATA, index=False)
-            st.success("Berhasil diupdate!")
+            st.success("Data berhasil diupdate!")
             st.rerun()
 
+# D. Halaman Master Data
 elif st.session_state.page == "Master":
     st.title("➕ Master Data Part")
-    edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic")
-    if st.button("Simpan Perubahan Master"):
-        edited_df.to_csv(FILE_DATA, index=False)
-        st.success("Data master diperbarui!")
+    # Editor data interaktif sesuai gambar Anda
+    edited = st.data_editor(df, use_container_width=True, num_rows="dynamic")
+    if st.button("Simpan Seluruh Perubahan Master"):
+        edited.to_csv(FILE_DATA, index=False)
+        st.success("Master data diperbarui!")
         st.rerun()
 
 # ==========================================
-# 6. LOGIKA JAM REAL-TIME (UPDATE OTOMATIS)
+# 6. LOGIKA JAM REAL-TIME (Wajib di Paling Bawah)
 # ==========================================
 while True:
-    now = datetime.now()
+    skrg = datetime.now()
     container_jam.markdown(f"""
-        <div style="text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background-color: #f9f9f9;">
-            <p style="font-size: 1rem; font-weight: bold; color: #333; margin-bottom: 0;">{now.strftime("%A, %d %B %Y")}</p>
-            <h1 style="font-size: 2.8rem; margin-top: -5px; color: #000; font-family: monospace;">{now.strftime("%H:%M:%S")}</h1>
+        <div style="text-align: center; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px; background-color: #f8f9fa;">
+            <p style="font-size: 1rem; font-weight: bold; color: #333; margin-bottom: 0;">{skrg.strftime("%A, %d %B %Y")}</p>
+            <h1 style="font-size: 2.6rem; margin-top: -8px; color: #000; font-family: 'Courier New', monospace;">{skrg.strftime("%H:%M:%S")}</h1>
         </div>
     """, unsafe_allow_html=True)
     time.sleep(1)
