@@ -15,14 +15,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS agar tampilan persis seperti permintaan Anda
+# Custom CSS untuk merapikan tampilan
 def local_css():
     st.markdown("""
     <style>
-    /* Main Background */
+    /* Main Background Gelap */
     .stApp { background-color: #0e1117; color: #ffffff; }
     
-    /* Sidebar Styling */
+    /* Sidebar Putih */
     [data-testid="stSidebar"] {
         background-color: #ffffff !important;
         padding-top: 1rem !important;
@@ -66,11 +66,14 @@ def local_css():
     /* Metrik Card */
     div[data-testid="stMetricValue"] { font-size: 2rem; font-weight: bold; }
     
-    /* Status Box */
-    .status-box {
-        padding: 20px;
+    /* Styling Jam */
+    .clock-box {
+        text-align: center;
+        border: 1.5px solid #ddd;
         border-radius: 10px;
-        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        margin-top: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -87,7 +90,7 @@ def load_data():
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # Konversi kolom tanggal agar tidak error saat olah data
+            # Konversi kolom tanggal
             df['Tanggal Terakhir Ganti'] = pd.to_datetime(df['Tanggal Terakhir Ganti']).dt.date
             df['Jadwal Jatuh Tempo'] = pd.to_datetime(df['Jadwal Jatuh Tempo']).dt.date
             return df
@@ -97,7 +100,7 @@ def load_data():
         return create_initial_data()
 
 def create_initial_data():
-    # Menggunakan Nama Kolom yang Konsisten 'Status TPM' (Bukan TPN)
+    # Menggunakan 'Status TPM' (BUKAN TPN)
     data = {
         'ID': [1],
         'Nama Mesin': ['Bucket Elevator'],
@@ -122,7 +125,7 @@ df = load_data()
 # 3. SIDEBAR (LOGO, JAM WIB, NAVIGASI)
 # ==========================================
 with st.sidebar:
-    # Logo Lokal
+    # Logo dari folder lokal
     if os.path.exists("logo_toyota.png"):
         st.image("logo_toyota.png", use_container_width=True)
     else:
@@ -150,12 +153,12 @@ with st.sidebar:
     search_term = st.text_input("Ketik nama part/mesin", placeholder="Search...", label_visibility="collapsed")
 
 # ==========================================
-# 4. HALAMAN DASHBOARD MONITORING
+# 4. FUNGSI HALAMAN (DIPISAH AGAR TIDAK BAYANGAN)
 # ==========================================
 def show_dashboard(data_df):
-    st.title("📊 Maindashboard Monitoring")
+    st.title("📊 Maindashboard Monitoring") #
     
-    # Zona Waktu WIB (UTC+7) untuk perbandingan jatuh tempo
+    # Zona Waktu WIB (UTC+7)
     current_date_wib = (datetime.utcnow() + timedelta(hours=7)).date()
     
     # Metrik Dashboard
@@ -201,15 +204,14 @@ def show_dashboard(data_df):
     else:
         st.success("Semua part dalam kondisi On Schedule!")
 
-# ==========================================
-# 5. HALAMAN UPDATE PENGGANTIAN
-# ==========================================
 def show_update(data_df):
     st.title("🛠️ Update Penggantian Part")
     with st.form("form_update"):
         st.write("Input data penggantian sparepart baru")
-        selected_part = st.selectbox("Pilih Part yang Diganti", 
-                                     options=(data_df['Nama Mesin'] + " | " + data_df['Nama Part']).tolist())
+        # Dropdown kombinasi
+        options = (data_df['Nama Mesin'] + " | " + data_df['Nama Part']).tolist()
+        selected_part = st.selectbox("Pilih Part yang Diganti", options=options)
+        
         tgl_ganti = st.date_input("Tanggal Penggantian", datetime.now())
         pic_input = st.text_input("PIC Eksekutor")
         
@@ -230,11 +232,8 @@ def show_update(data_df):
             time.sleep(1)
             st.rerun()
 
-# ==========================================
-# 6. HALAMAN MASTER DATA
-# ==========================================
 def show_master(data_df):
-    st.title("➕ Master Data Part")
+    st.title("➕ Master Data Part") #
     
     # Form Tambah Data Baru
     with st.expander("➕ Tambah Part Baru"):
@@ -276,7 +275,7 @@ def show_master(data_df):
         st.rerun()
 
 # ==========================================
-# 7. LOGIKA JALANKAN APLIKASI
+# 5. ROUTER (LOGIKA UTAMA)
 # ==========================================
 
 # Logika Pencarian Universal
@@ -298,19 +297,19 @@ else:
         show_master(df)
 
 # ==========================================
-# 8. LOGIKA JAM REAL-TIME WIB (Update per Detik)
+# 6. LOGIKA JAM REAL-TIME WIB (Update per Detik)
 # ==========================================
-# Penting: Loop ini harus di paling akhir agar tidak menghentikan fungsi streamlit di atas
+# Loop ini harus di paling akhir agar tidak menghentikan fungsi streamlit
 while True:
     # GitHub Server (UTC) + 7 Jam = WIB
     now_wib = datetime.utcnow() + timedelta(hours=7)
     
     clock_placeholder.markdown(f"""
-        <div style="text-align: center; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px; background-color: #f8f9fa; margin-top: 10px;">
+        <div class="clock-box">
             <p style="font-size: 1.1rem; font-weight: bold; color: #333; margin-bottom: 0;">{now_wib.strftime("%A, %d %B %Y")}</p>
             <h1 style="font-size: 2.8rem; margin-top: -10px; color: #000000; font-family: 'Courier New', Courier, monospace;">{now_wib.strftime("%H:%M:%S")}</h1>
             <p style="font-size: 0.8rem; color: #ff0000; font-weight: bold; margin-top: -5px;">Waktu Indonesia Barat (WIB)</p>
         </div>
     """, unsafe_allow_html=True)
     
-    time.sleep(1) # Refresh setiap 1 detik agar jam berdetak
+    time.sleep(1) # Refresh setiap 1 detik
