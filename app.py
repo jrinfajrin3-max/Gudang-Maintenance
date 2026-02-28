@@ -1,4 +1,4 @@
-mport streamlit as st
+import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
@@ -327,3 +327,4 @@ elif st.session_state.page == "Master":
         edited_df.to_csv(FILE_DATA, index=False)
         st.success("Data Master Berhasil Diperbarui!")
         st.rerun()
+
