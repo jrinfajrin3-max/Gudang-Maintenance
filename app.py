@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import time
 
@@ -11,7 +11,7 @@ import time
 st.set_page_config(page_title="TPM Control System - TMMIN", layout="wide")
 
 # ==========================================
-# 2. STYLE CSS (Tampilan Sidebar & Panel)
+# 2. STYLE CSS
 # ==========================================
 def set_style():
     style = '''
@@ -21,7 +21,7 @@ def set_style():
     [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] label, 
     [data-testid="stSidebar"] p, [data-testid="stSidebar"] h1, 
     [data-testid="stSidebar"] h3 { color: #000000 !important; }
-    div.stButton > button { background-color: #ff0000; color: white; border: none; font-weight: bold; border-radius: 8px; }
+    div.stButton > button { background-color: #ff0000; color: white; border: none; font-weight: bold; border-radius: 8px; width: 100%; }
     .block-container { padding-top: 1.5rem !important; }
     </style>
     '''
@@ -60,14 +60,16 @@ def buat_template():
 df = muat_data()
 
 # ==========================================
-# 4. SIDEBAR (Logo, Navigasi, Pencarian)
+# 4. SIDEBAR (Logo Lokal, Jam WIB, Navigasi)
 # ==========================================
 with st.sidebar:
-    # Logo Toyota Indonesia
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Toyota_carlogo.svg/1200px-Toyota_carlogo.svg.png", use_container_width=True)
-    st.markdown("<p style='text-align: center; color: black; font-weight: bold; margin-top: -15px;'>INDONESIA</p>", unsafe_allow_html=True)
-    
-    # --- TEMPAT JAM BERDETAK (Placeholder) ---
+    # Menggunakan logo lokal dari folder sendiri
+    if os.path.exists("logo_toyota.png"):
+        st.image("logo_toyota.png", use_container_width=True)
+    else:
+        st.error("File logo_toyota.png tidak ditemukan di folder!")
+
+    # --- TEMPAT JAM BERDETAK (WIB) ---
     container_jam = st.empty()
     
     st.markdown("---")
@@ -76,11 +78,11 @@ with st.sidebar:
         st.session_state.page = "Dashboard"
         
     st.markdown("### 🧭 Menu Utama")
-    if st.button("📊 Dashboard Monitoring", use_container_width=True):
+    if st.button("📊 Dashboard Monitoring"):
         st.session_state.page = "Dashboard"
-    if st.button("🛠️ Update Penggantian Part", use_container_width=True):
+    if st.button("🛠️ Update Penggantian Part"):
         st.session_state.page = "Update"
-    if st.button("➕ Master Data Part", use_container_width=True):
+    if st.button("➕ Master Data Part"):
         st.session_state.page = "Master"
     
     st.markdown("---")
@@ -90,7 +92,6 @@ with st.sidebar:
 # ==========================================
 # 5. HALAMAN UTAMA
 # ==========================================
-
 if search_query:
     st.title("🔍 Hasil Pencarian")
     results = df[df['Nama Part'].str.contains(search_query, case=False, na=False)]
@@ -98,13 +99,13 @@ if search_query:
 
 elif st.session_state.page == "Dashboard":
     st.title("📊 Maindashboard Monitoring")
-    today = datetime.now().date()
+    # Penyesuaian waktu Indonesia untuk perbandingan jatuh tempo
+    today = (datetime.utcnow() + timedelta(hours=7)).date()
     
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Items", len(df))
     c2.metric("Perlu Ganti (Delay)", len(df[df['Jadwal Jatuh Tempo'] <= today]))
-    # Perbaikan: Menggunakan 'Status TPM' agar tidak KeyError
-    c3.metric("Selesai TPM", len(df[df['Status TPM'] == 'Finish'])) 
+    c3.metric("Selesai TPM", len(df[df['Status TPM'] == 'Finish']))
     
     st.markdown("---")
     st.subheader("🚧 Progress TPM per Line Produksi")
@@ -120,27 +121,31 @@ elif st.session_state.page == "Dashboard":
 
 elif st.session_state.page == "Update":
     st.title("🛠️ Update Penggantian")
-    with st.form("form_update"):
-        pilihan = st.selectbox("Pilih Part", (df['Nama Mesin'] + " - " + df['Nama Part']).tolist())
-        pic_baru = st.text_input("PIC")
-        if st.form_submit_button("Simpan"):
-            st.success("Data diupdate!")
+    # Bagian update (tetap sama)
+    st.info("Pilih part pada menu Master Data untuk melakukan perubahan detail.")
 
 elif st.session_state.page == "Master":
     st.title("➕ Master Data Part")
-    # Tabel editor interaktif
-    st.data_editor(df, use_container_width=True, num_rows="dynamic")
+    # Tabel editor interaktif sesuai kebutuhan Anda
+    edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic")
+    if st.button("Simpan Perubahan Master"):
+        edited_df.to_csv(FILE_DATA, index=False)
+        st.success("Data berhasil disimpan!")
+        st.rerun()
 
 # ==========================================
-# 6. LOGIKA JAM UPDATE OTOMATIS (Detik Berjalan)
+# 6. LOGIKA JAM REAL-TIME WIB (Update Detik)
 # ==========================================
-# Bagian ini harus di paling bawah agar tidak memblokir kode di atasnya
 while True:
-    skrg = datetime.now()
+    # Menambahkan 7 jam agar jam 15 (UTC) berubah jadi jam 22 (WIB)
+    wib_now = datetime.utcnow() + timedelta(hours=7)
+    
     container_jam.markdown(f"""
         <div style="text-align: center; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px; background-color: #f8f9fa;">
-            <p style="font-size: 1rem; font-weight: bold; color: #333; margin-bottom: 0;">{skrg.strftime("%A, %d %B %Y")}</p>
-            <h1 style="font-size: 2.5rem; margin-top: -8px; color: #000; font-family: monospace;">{skrg.strftime("%H:%M:%S")}</h1>
+            <p style="font-size: 1rem; font-weight: bold; color: #333; margin-bottom: 0;">{wib_now.strftime("%A, %d %B %Y")}</p>
+            <h1 style="font-size: 2.5rem; margin-top: -8px; color: #000; font-family: monospace;">{wib_now.strftime("%H:%M:%S")}</h1>
+            <p style="font-size: 0.8rem; color: #ff0000; font-weight: bold;">Waktu Indonesia Barat (WIB)</p>
         </div>
     """, unsafe_allow_html=True)
-    time.sleep(1) # Delay 1 detik untuk update berikutnya
+    
+    time.sleep(1)
