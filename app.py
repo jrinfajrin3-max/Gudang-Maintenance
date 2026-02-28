@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from datetime import date
 import base64
+import time # Tambahkan library time untuk jeda
 
 # ==========================================
 # KONFIGURASI HALAMAN
@@ -59,6 +60,18 @@ def set_futuristic_style():
     
     [data-testid="stDataFrame"] {{
         border: 1px solid #333333;
+    }}
+    
+    /* CSS UNTUK TULISAN KONFIRMASI BESAR */
+    .big-font {{
+        font-size:30px !important;
+        font-weight: bold;
+        text-align: center;
+        color: #00ff00; /* Hijau neon */
+        padding: 20px;
+        border: 2px solid #00ff00;
+        border-radius: 10px;
+        margin-bottom: 20px;
     }}
     
     </style>
@@ -149,13 +162,17 @@ if app_mode == "Dashboard Utama":
                     current_stock = df.loc[df['Nama Barang'] == selected_item, 'Stok'].values[0]
                     if qty_out <= current_stock:
                         df.loc[df['Nama Barang'] == selected_item, 'Stok'] -= qty_out
+                        df.to_csv(FILE_DATA, index=False)
+                        
+                        # --- KONFIRMASI PENGAMBILAN (Besar di Tengah) ---
+                        st.markdown(f'<p class="big-font">✅ BERHASIL MENGAMBIL {qty_out} PCS {selected_item.upper()}!</p>', unsafe_allow_html=True)
+                        time.sleep(2) # Beri jeda 2 detik agar terbaca
+                        
                         if status_bekas == "Repairable":
                             st.warning(f"Barang {selected_item} dikirim ke workshop untuk repair.")
-                        df.to_csv(FILE_DATA, index=False)
-                        st.success(f"Berhasil mengambil {qty_out} pcs.")
                         st.rerun()
                     else:
-                        st.error("Stok tidak cukup!")
+                        st.error("❌ Stok tidak cukup!")
         else:
             st.warning("Barang tidak ditemukan.")
 
@@ -241,5 +258,10 @@ elif app_mode == "Update Gudang":
                 df = pd.concat([df, new_data], ignore_index=True)
             
             df.to_csv(FILE_DATA, index=False)
-            st.success("Inventaris diperbarui.")
+            
+            # --- KONFIRMASI UPDATE (Besar di Tengah) ---
+            st.markdown(f'<p class="big-font">✅ DATA {nama.upper()} BERHASIL DIPERBARUI!</p>', unsafe_allow_html=True)
+            time.sleep(2) # Beri jeda 2 detik
+            
+            # Tunggu sebentar lalu refresh
             st.rerun()
